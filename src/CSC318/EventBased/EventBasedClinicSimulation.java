@@ -3,6 +3,12 @@
 *   Event Based Simulation
 * @author Bobby Purcell
 * @description /TODO: Write Desc
+* Events:
+*   1- PatientArrive, calls
+*   2- PatientDeath
+*   3- PatientTreatment, removes death event
+*   4- SimulationEnd, calcs stats
+*
 =====================================================================================================*/
 package CSC318.EventBased;
 
