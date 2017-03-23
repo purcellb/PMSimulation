@@ -14,18 +14,34 @@ public class EventBasedClinicSimulation {
 
         //TODO: arrival rate of 3/hr poisson distribution
         //TODO: NewPatient event
+
         //Calls UniformlyDistributedAilment to get what kind of patient to make
         //Makes new patient Patient(number,ailment)
+        //adds the new patient to the arraylist of events in order
 
         //TODO: doctor treatment rates, probably dont need doctor objects
 
     }
 }
-//TODO: Patient class
-//TODO: Patient ID, Type of ailment, Patient balk/death time(this is normally distributed SD's are listed),
-//constructor determines death time
-//adds the new patient to the arraylist of events in order
 
+/*=====================================================================================================
+Patient class
+represents a patient at the clinic
+Has Patient ID, Type of ailment, and balk/death time
+constructor determines death time
+=====================================================================================================*/
+//TODO: Patient ID, Type of ailment, Patient, wait, arrival, and balk/death times(this is normally distributed SD's are listed),
+class Patient {
+    protected int ailmentType;  //1= heart,2=bleeding, 3=gastro
+    protected double tArrive, tWait, tDeath;//arrival time, time waited, time will die
+    protected int ID; //patient ID
+
+    public Patient(int ID, int ailment) {
+        this.ID = ID;
+        this.ailmentType = ailment;
+        tArrive = tWait = tDeath = 0;
+    }
+}
 
 /*=====================================================================================================
 GenericManager class
