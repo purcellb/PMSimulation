@@ -2,7 +2,7 @@
 * @title Payless Medical Service
 *   Event Based Simulation
 * @author Bobby Purcell
-* @description /TODO: Write Desc
+* @description : not exactly my magnum opus but it works well enough
 * Events:
 *   1- PatientArrive, calls
 *   2- PatientDeath
@@ -14,38 +14,190 @@ package CSC318.EventBased;
 
 import java.util.ArrayList;
 
+@SuppressWarnings("unchecked")
 public class EventBasedClinicSimulation {
 
     public static void main(String[] args) {
 
-        //TODO: arrival rate of 3/hr poisson distribution
-        //TODO: NewPatient event
+        double bigTime = 0.0; //the master clock
+        double timeToRun = 6000; //6000 minutes = 100hrs
+        double EventTime;// the event time
+        double deltime; //change in time
+        //TODO: setup patient death time tracking something something
 
-        //Calls UniformlyDistributedAilment to get what kind of patient to make
+        GenericManager eventQ = new GenericManager<Event>(); //order of events
+        GenericManager patQ = new GenericManager<Patient>(); //patients in waiting room
+        int patientID = 0;  //unique id for patients (and their death event when appropriate)
+        double numDocs = 1.0;    //how many docs are treating patients at the clinic
+        int numWaiting;
+        int numEvent;
+        int totalHeart = 0, totalGastro = 0, totalBleed = 0,
+                totalHeartDead = 0, totalGastroDead = 0, totalBleedDead = 0;
+
+        //total wait time for each patient type (for avgs)
+        double totalTimeWaitHeart = 0.0, totalTimeWaitGastro = 0.0, totalTimeWaitBleed = 0.0;
+        //,totalTimeWaitHeart2 = 0.0, totalTimeWaitGastro2 = 0.0, totalTimeWaitBleed2 = 0.0;
+        int myDeadPatient;
+        boolean doctorIsBusy, doctorIsBusy2;
+
+
         //Makes new patient Patient(number,ailment)
         //adds the new patient to the arraylist of events in order
+        //prime the Queue
+        patientID++;
+        eventQ.addFront(new Event(0, 1, patientID));
+        eventQ.addEnd(new Event(timeToRun, 4, -9999));
+        Event current = (Event) eventQ.getValue(0);
+        while (current.getEventType() != 4) {
+            deltime = current.getTime() - bigTime;
 
-        //TODO: doctor treatment rates, probably dont need doctor objects
+
+            //cycle to next event
+            eventQ.managedRemove(0);
+            current = (Event) eventQ.getValue(0);
+
+        }//end of while(not event 4)
+        //todo: Its reportin time
+    }
+
+    public static void AddEvent() {
 
     }
-}
+
+    //generates new patient arrival from rate 3/hr
+    public static double TimeToArrive() {
+        double deltime;
+        double bigX;
+        double bigx = Math.random();
+        if (bigx > .9) bigx = Math.random();
+        deltime = -Math.log(1.0 - bigx) / 3.0;
+        return deltime;
+    }//end timetoarrive
+
+    //generates new patient arrival from rate 3/hr
+    public static double TimeToTreat(int a, int numDocs) {
+        double timeTreat;
+        double bigx = Math.random();
+        double rate = 0.0; //number of patients/hr
+
+        switch (a) {
+
+            case 1://Heart
+                rate = 2.0;
+                break;
+            case 2://Gastro
+                rate = 4.0;
+                break;
+            case 3://Bleed
+                rate = 6.0;
+                break;
+            default:
+                System.err.println("Wtf? This patient doesnt have an illness! Literally impossible.");
+                System.exit(1);//there is a serious problem, exit
+        }
+        timeTreat = 60 * Math.log(1.0 - bigx) / -(rate * numDocs);
+        return timeTreat;
+    }//end timetoarrive
+
+
+}//end EventBasedClinicSimulation
 
 /*=====================================================================================================
 Patient class
 represents a patient at the clinic
-Has Patient ID, Type of ailment, and balk/death time
-constructor determines death time
+Has Patient ID, Type of ailment, and arrival, wait, and total time
 =====================================================================================================*/
-//TODO: Patient ID, Type of ailment, Patient, wait, arrival, and balk/death times(this is normally distributed SD's are listed),
-class Patient {
-    protected int ailmentType;  //1= heart,2=bleeding, 3=gastro
-    protected double tArrive, tWait, tDeath;//arrival time, time waited, time will die
+class Patient implements Comparable {
+    protected int ailmentType;  //1= heart,2=gastro, 3=bleeding
+    //arrival time, time waited, time till death, time in system
+    protected double tArrive;
+    protected double tWait;
+    protected double tDeath;
+    protected int myDeath;
     protected int ID; //patient ID
 
-    public Patient(int ID, int ailment) {
+    public Patient(int ID) {
         this.ID = ID;
-        this.ailmentType = ailment;
-        tArrive = tWait = tDeath = 0;
+        this.myDeath = ID;
+        this.ailmentType = setAilmentType();
+        settDeath(); //generate patient death time
+        tArrive = tWait = 0;
+    }
+
+    public int getAilmentType() {
+        return ailmentType;
+    }
+
+    private int setAilmentType() {
+        int r;
+
+        int x = ((int) (Math.random() * 100));
+        if (x < 30) {
+            r = 1; //Heart
+        } else if (x < 50) {
+            r = 2;//Gastro
+        } else r = 3;//Bleed
+        return r;
+    }
+
+
+    public double gettArrive() {
+        return tArrive;
+    }
+
+    public void settArrive(double tArrive) {
+        this.tArrive = tArrive;
+    }
+
+    public double gettWait() {
+        return tWait;
+    }
+
+    public void settWait(double tWait) {
+        this.tWait += tWait;
+    }
+
+    public double gettDeath() {
+        return tDeath;
+    }
+
+    public void settDeath() {
+        double dTimer;
+        int t = getAilmentType();
+        double mu = 0.0, sigma = 0.0;
+        switch (t) {
+
+            case 1:
+                mu = 10;
+                sigma = 35;
+                break;
+            case 2:
+                mu = 30;
+                sigma = 80;
+                break;
+            case 3:
+                mu = 20;
+                sigma = 65;
+                break;
+            default:
+                System.err.println("Wtf? This patient doesnt have an illness and expects to die!");
+                System.exit(1);//there is a serious problem, exit
+        }
+
+        dTimer = sigma * (Math.random()) + mu;      //TODO: not random enough yet
+        tDeath = dTimer;
+    }
+
+    @Override
+    public int compareTo(Object o) {
+        if (gettWait() > ((Patient) o).gettWait()) {
+            return 1;
+        } else if (gettWait() < ((Patient) o).gettWait()) {
+            return -1;
+        } else {
+            return 0;
+        }
+
     }
 }
 
@@ -165,7 +317,10 @@ class Event implements Comparable {
     public Event(double time, int eventType, int customer) {
         this.eventType = eventType;
         this.time = time;
-        this.customer = customer;
+        if (eventType == 2)
+            this.customer = customer;
+        else
+            this.customer = -9;
     }
 
     @Override
