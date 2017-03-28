@@ -23,8 +23,6 @@ public class EventBasedClinicSimulation {
         double bigTime = 0.0; //the master clock
         double timeToRun = 6000; //6000 minutes = 100hrs
         double eventTime;// the event time
-        double deltime; //change in time
-        //TODO: setup patient death time tracking something something
 
         GenericManager eventQ = new GenericManager<>(); //order of events
         GenericManager patQ = new GenericManager<>(); //patients in waiting room
@@ -45,16 +43,16 @@ public class EventBasedClinicSimulation {
         eventQ.addEnd(new Event(timeToRun, 4, -9999));
         Event current = (Event) eventQ.getValue(0);
 
-        while (current.getEventType() != 4 && bigTime <=timeToRun) {
+        while (current.getEventType() != 4) {
             numEvent++;
-            deltime = current.getTime() - bigTime;
-            eventTime = bigTime + deltime;
+            //deltime = current.getTime() - bigTime;
+            //eventTime = bigTime + deltime;
             bigTime = current.getTime();
             switch (current.eventType) {
                 case 1: // arrival event------------------------------------------------------------------------
 
                     //new patient
-                    Patient p = new Patient(patientID, bigTime);
+                    Patient p = new Patient(patientID, current.getTime());
 
                     //add patient to line
                     patQ.addInOrder(p);
@@ -65,29 +63,35 @@ public class EventBasedClinicSimulation {
                     //how long is p's treatment time?
                     double pTreatTime = TimeToTreat(p.getAilmentType(), numDocs);
 
-                    //set this patients treatment time to the wait + their time to treat
+                    //set this patients treatment time to how long it will take to treat them
                     p.settTreat(pTreatTime);
+
+                    //set this patients wait time to how long the current wait is counting their treatment time
                     p.settWait(currentWait);
-                    //i set this AFTER the sum of current treatment time so the patients
-                    //own treatment time doesnt factor into their wait to be treated
 
                     //gen new treatmentevent
-                    // (current big time, plus ps treatment time, plus the people ahead of p in line)1
+                    // (current big time, plus ps treatment time, plus the people ahead of p in line)
                     eventTime = (p.gettWait());
                     Event te = new Event(eventTime, 3, patientID);
                     eventQ.addInOrder(te);
 
                     //gen new death event
-                    eventTime = (bigTime + p.gettDeath()); //patient.
+                    eventTime = (bigTime + p.gettDeath());
                     Event de = new Event(eventTime, 2, patientID);
                     eventQ.addInOrder(de);
 
                     patientID++;
                     //gen new arrival
-                    eventTime = (bigTime + TimeToArrive());
+                    try {
+                        eventTime = (bigTime + TimeToArrive());
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        System.exit(1);
+                    }
                     Event ae = new Event(eventTime, 1, patientID);
                     eventQ.addInOrder(ae);
-
+                    System.out.println("Patient " + patientID + " arrival event created at event time\t" + eventTime
+                            + "\n\t\t\t\t\t\t\tfrom bigTime " + bigTime);
 
                     break;
                 case 2: // death event------------------------------------------------------------------------
@@ -104,11 +108,11 @@ public class EventBasedClinicSimulation {
                         case 3:
                             totalBleedDead += 1;
                             break;
-                        default:
+                        case -1:
                             System.err.printf("Tried to kill patient %d, didnt find them.\n", current.getPatient());
                     }
                     //remove treatment event
-                    KillPatientEvent(current.getPatient(), 3, eventQ);
+                    RemovePatientEvent(current.getPatient(), 3, eventQ);
 
                     break;
                 case 3: // treatment event------------------------------------------------------------------------
@@ -125,11 +129,11 @@ public class EventBasedClinicSimulation {
                         case 3:
                             totalBleed += 1;
                             break;
-                        default:
+                        case -1:
                             System.err.printf("Tried to treat patient %d, didnt find them.\n", current.getPatient());
                     }
                     //remove death event
-                    KillPatientEvent(current.getPatient(), 2, eventQ);
+                    RemovePatientEvent(current.getPatient(), 2, eventQ);
 
                     break;
                 case 4: // end simulation event-------------------------------------------------------------
@@ -142,15 +146,16 @@ public class EventBasedClinicSimulation {
             //cycle to next event
             eventQ.managedRemove(0);
             current = (Event) eventQ.getValue(0);
-            //patQ.sort();  //TODO: do i need to sort here or not? i cant even tell whats wrong when i sort vs not sort
-            //eventQ.sort();
+
         }//end of while(not event 4)
+
         //todo: Its reportin time
         int totalTreated = totalBleed + totalGastro + totalHeart;
         int totalDead = totalBleedDead + totalGastroDead + totalHeartDead;
 
         System.out.println("Total Treated =" + totalTreated);
         System.out.println("Total Dead =" + totalDead);
+        System.out.println("Last Patient ID =" + patientID);
     }
 
     private static double CalcCurrentWait(GenericManager pQ) {
@@ -196,7 +201,7 @@ public class EventBasedClinicSimulation {
         else return -1;
     }
 
-    private static int KillPatientEvent(int patient, int eventType, GenericManager eventQ) {
+    private static int RemovePatientEvent(int patient, int eventType, GenericManager eventQ) {
         boolean removede = false;
         Event e = null;
         //search the ques for matching items and remove them
@@ -213,11 +218,21 @@ public class EventBasedClinicSimulation {
 
 
     //generates new patient arrival from rate 3/hr
-    public static double TimeToArrive() { //todo: pretty sure this implementation is the core of my issues
-        double deltime;
-        double bigx = Math.random();
-        //while (bigx > .9) bigx = Math.random();
-        deltime = 60 * (Math.log(bigx)/-3.0);
+    public static double TimeToArrive() throws Exception {
+        double deltime = -1;
+        double bigx;
+        while (deltime < 0) {
+            //throws out negative results...i don't know how else to handle this, been stuck
+            //with this for literally days.
+            bigx = Math.random();
+            deltime = (Math.log(1-bigx) / -3.00);
+        }
+        if (deltime < 0) {
+            throw new Exception("CANT ARRIVE IN THE PAST: " + deltime);
+
+        }
+        //convert to minutes
+        deltime = 60 * deltime;
         return deltime;
     }//end timetoarrive
 
@@ -242,9 +257,9 @@ public class EventBasedClinicSimulation {
                 System.exit(1);//there is a serious problem, exit
         }
 
-        timeTreat = 60 * Math.log( bigx) / -(rate * numDocs);
+        timeTreat = 60 * Math.log(1 - bigx) / (-rate * numDocs);
         return timeTreat;
-    }//end timetoarrive
+    }//end timetoTreat
 
 
 }//end EventBasedClinicSimulation
@@ -258,7 +273,7 @@ class Patient implements Comparable {
     protected int ailmentType;  //1= heart,2=gastro, 3=bleeding
     //arrival time, time waited, time till death, time in system
     protected double tArrive;
-    protected double tTreat;
+    protected double tTreat; //how long ilness will take to treat
     protected double tWait;
     protected double tDeath;
     protected int myDeath;
@@ -269,8 +284,9 @@ class Patient implements Comparable {
         this.myDeath = ID;
         tWait = tTreat = 0;//defualt these to zero for safety
         this.ailmentType = setAilmentType();
-        settDeath(); //generate patient death time
         tArrive = bigTime;
+        settDeath(); //generate patient death time
+
     }
 
     public double gettTreat() {
@@ -296,10 +312,10 @@ class Patient implements Comparable {
     private int setAilmentType() {
         int r;
 
-        int x = ((int) (Math.random() * 100));
-        if (x < 30) {
+        int x = ((int) (Math.random() * 10));
+        if (x <= 3) {
             r = 1; //Heart
-        } else if (x < 50) {
+        } else if (x <= 5) {
             r = 2;//Gastro
         } else r = 3;//Bleed
         return r;
@@ -354,11 +370,12 @@ class Patient implements Comparable {
     }
 
     @Override
+    //the returns are intentionally reversed so patients line up in reverse wait order. FIFO
     public int compareTo(Object o) {
         if (gettWait() > ((Patient) o).gettWait()) {
-            return 1;
-        } else if (gettWait() < ((Patient) o).gettWait()) {
             return -1;
+        } else if (gettWait() < ((Patient) o).gettWait()) {
+            return 1;
         } else {
             return 0;
         }
