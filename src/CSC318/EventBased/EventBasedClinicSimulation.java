@@ -43,7 +43,7 @@ public class EventBasedClinicSimulation {
         eventQ.addEnd(new Event(timeToRun, 4, -9999));
         Event current = (Event) eventQ.getValue(0);
 
-        while (current.getEventType() != 4) {
+        while (bigTime <= timeToRun ) {
             numEvent++;
             //deltime = current.getTime() - bigTime;
             //eventTime = bigTime + deltime;
@@ -137,9 +137,15 @@ public class EventBasedClinicSimulation {
 
                     break;
                 case 4: // end simulation event-------------------------------------------------------------
-                    //go home end sim event. youre drunk.
-                    System.err.println("should not be here and if i am i've got event proc issues");
-                    System.exit(1);
+//
+                    //todo: Its reportin time
+                    int totalTreated = totalBleed + totalGastro + totalHeart;
+                    int totalDead = totalBleedDead + totalGastroDead + totalHeartDead;
+
+                    System.out.println("Total Treated =" + totalTreated);
+                    System.out.println("Total Dead =" + totalDead);
+                    System.out.println("Last Patient ID =" + patientID);
+
                     break;
             }
 
@@ -149,13 +155,7 @@ public class EventBasedClinicSimulation {
 
         }//end of while(not event 4)
 
-        //todo: Its reportin time
-        int totalTreated = totalBleed + totalGastro + totalHeart;
-        int totalDead = totalBleedDead + totalGastroDead + totalHeartDead;
 
-        System.out.println("Total Treated =" + totalTreated);
-        System.out.println("Total Dead =" + totalDead);
-        System.out.println("Last Patient ID =" + patientID);
     }
 
     private static double CalcCurrentWait(GenericManager pQ) {
@@ -221,19 +221,32 @@ public class EventBasedClinicSimulation {
     public static double TimeToArrive() throws Exception {
         double deltime = -1;
         double bigx;
-        while (deltime < 0) {
-            //throws out negative results...i don't know how else to handle this, been stuck
-            //with this for literally days.
-            bigx = Math.random();
-            deltime = (Math.log(1-bigx) / -3.00);
-        }
-        if (deltime < 0) {
-            throw new Exception("CANT ARRIVE IN THE PAST: " + deltime);
+//        while (deltime < 0) {
+//            //throws out negative results...i don't know how else to handle this, been stuck
+//            //with this for literally days.
+//            bigx = Math.random();
+//            deltime = (Math.log(1-bigx) / -3.00);
+//        }
+//        if (deltime < 0) {
+//            throw new Exception("CANT ARRIVE IN THE PAST: " + deltime);
+//
+//        }
+//        //convert to minutes
+//
 
-        }
-        //convert to minutes
-        deltime = 60 * deltime;
+        double L = Math.exp(-3.0);
+        double p = 1.0;
+        int k = 0;
+
+        do {
+            k++;
+            p *= Math.random();
+        } while (p > L);
+
+
+        deltime = 60 * (k - 1);
         return deltime;
+
     }//end timetoarrive
 
     //generates new treatment duration for a patients treatment event
