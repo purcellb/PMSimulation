@@ -60,26 +60,19 @@ public class EventBasedClinicSimulation {
                     //add patient to line
                     patQ.addInOrder(p);
 
-                    //how long is the current waiting lines total treatment time? (sum of treatment times)
-                    currentWait = CalcCurrentWait(patQ);
+//                    //how long is the current waiting lines total treatment time? (sum of treatment times)
+//                    currentWait = CalcCurrentWait(patQ);
+//
+//                    //how long is p's treatment time?
+//                    double pTreatTime = TimeToTreat(p.getAilmentType(), numDocs);
+//
+//                    //set this patients treatment time to how long it will take to treat them
+//                    p.settTreat(pTreatTime);
+//
+//                    //set this patients wait time to how long the current wait is counting their treatment time
+//                    p.settWait(currentWait);
 
-                    //how long is p's treatment time?
-                    double pTreatTime = TimeToTreat(p.getAilmentType(), numDocs);
 
-                    //set this patients treatment time to how long it will take to treat them
-                    p.settTreat(pTreatTime);
-
-                    //set this patients wait time to how long the current wait is counting their treatment time
-                    p.settWait(currentWait);
-
-                    //gen new treatmentevent
-                    // (current big time, plus ps treatment time, plus the people ahead of p in line)
-                    eventTime = (p.gettWait());
-                    Event te = new Event(eventTime, EventType.TREATMENT, patientID);
-                    eventQ.addInOrder(te);
-
-                    System.out.println("Patient " + patientID + " treatment event created at event time\t" + eventTime
-                            + "\n\t\t\t\t\t\t\t from bigTime " + bigTime);
 
                     //gen new death event
                     eventTime = (bigTime + p.gettDeath());
@@ -103,7 +96,7 @@ public class EventBasedClinicSimulation {
                 case DEATH: // death event------------------------------------------------------------------------
                     //patient died before treatment, remove from Qs
                     //resolve and track the dead patient
-                    int died = KillPatient(current.getPatient(), patQ);
+                    int died = RemovePatient(current.getPatient(), patQ);
                     switch (died) {
                         case 1:
                             totalHeartDead += 1;
@@ -117,17 +110,17 @@ public class EventBasedClinicSimulation {
                         case -1:
                             System.err.printf("Tried to kill patient %d, didnt find them.\n", current.getPatient());
                     }
-                    //remove treatment event
-                    RemovePatientEvent(current.getPatient(), bigTime, EventType.TREATMENT, eventQ);
+//                    //remove treatment event//DEPRECATED
+//                    RemovePatientEvent(current.getPatient(), bigTime, EventType.TREATMENT, eventQ);
 
                     break;
                 case TREATMENT: // treatment event------------------------------------------------------------------------
-                    //patient treated before death
-                    //resolve and track the patient
-                    int treated = TreatPatient(current.getPatient(), patQ);
-                    //decrement everyone elses wait time by this death/treatment
+                    //treats next patient in line
 
-                    switch (treated) {
+                    //resolve and track the patient
+                    Patient treating = (Patient)patQ.getValue(0);
+                    //increment count of treated patients for type
+                    switch (treating.getAilmentType()) {
                         case 1:
                             totalHeart += 1;
                             break;
@@ -138,10 +131,21 @@ public class EventBasedClinicSimulation {
                             totalBleed += 1;
                             break;
                         case -1:
-                            System.err.printf("Tried to treat patient %d, didnt find them.\n", current.getPatient());
+                            System.err.printf("Tried to treat patient %d, didnt find them.\n", treating.getID());
                     }
+                    patQ.managedRemove(0);
+
                     //remove death event
-                    RemovePatientEvent(current.getPatient(), bigTime, EventType.DEATH, eventQ);
+                    RemovePatientEvent(treating.getID(), bigTime, EventType.DEATH, eventQ);
+
+                    //TODO: Create next treatment event
+                    //gen new treatmentevent
+                    eventTime = (TimeToTreat());
+                    Event te = new Event(eventTime, EventType.TREATMENT, patientID);
+                    eventQ.addInOrder(te);
+
+                    System.out.println("Patient " + patientID + " treatment event created at event time\t" + eventTime
+                            + "\n\t\t\t\t\t\t\t from bigTime " + bigTime);
 
                     break;
                 case END: // end simulation event-------------------------------------------------------------
@@ -202,30 +206,8 @@ public class EventBasedClinicSimulation {
         return currentWait;
     }
 
-    private static int KillPatient(int patient, GenericManager patQ) {
-        boolean removedp = false;
-        Patient tp;
-        Patient p;
-        //removes treatment
-        //search the ques for matching items and remove them
-        for (int i = 0; i < patQ.getCount(); i++) {
-            p = (Patient) patQ.getValue(i);
-            if (p.getID() == patient) {
-                //decrements the wait time for everyone in line
-                for (int j = 0; j < patQ.getCount(); j++) {
-                    tp = ((Patient) patQ.getValue(j));
-                    tp.settWait(tp.gettWait() - p.gettTreat());
-                }
-                patQ.managedRemove(i);
-                patQ.sort();
-                return p.getAilmentType();
-            }
-        }
 
-        return -1;
-    }
-
-    private static int TreatPatient(int patient, GenericManager patQ) {
+    private static int RemovePatient(int patient, GenericManager patQ) {
         Patient patientToRem;
         Patient tp;
         //removes death
@@ -233,15 +215,11 @@ public class EventBasedClinicSimulation {
         for (int i = 0; i < patQ.getCount(); i++) {
             patientToRem = (Patient) patQ.getValue(i);
             if (patientToRem.getID() == patient) {
-                //decrements the wait time for everyone in line
-                for (int j = 0; j < patQ.getCount(); j++) {
-                    tp = ((Patient) patQ.getValue(j));
-                    tp.settWait(tp.gettWait() - patientToRem.gettTreat());
-                }
+
                 patQ.managedRemove(i);
                 patQ.sort();
 
-                return patientToRem.getAilmentType(); //returns what patient ailment was treated
+                return patientToRem.getAilmentType(); //returns what patient ailment killed the patient
             }
         }
         return -1;
