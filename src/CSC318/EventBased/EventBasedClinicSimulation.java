@@ -1,4 +1,4 @@
-/*=====================================================================================================
+/*=============================================================================
 * @title Payless Medical Service
 *   Event Based Simulation
 * @author Bobby Purcell
@@ -9,10 +9,11 @@
 *   3- PatientTreatment, removes death event
 *   4- SimulationEnd, calcs stats
 *
-=====================================================================================================*/
+==============================================================================*/
 package CSC318.EventBased;
 
 import java.util.ArrayList;
+import java.util.Random;
 
 //enumerated representation of events
 enum EventType {
@@ -31,13 +32,14 @@ public class EventBasedClinicSimulation {
         GenericManager patQ = new GenericManager<>(); //patients in waiting room
         int patientID = 1;  //unique id for patients (and their death event when appropriate)
         double numDocs = 1.0;    //how many docs are treating patients at the clinic
-        double currentWait;
+
+        //
         int numEvent = 0;
         int totalHeart = 0, totalGastro = 0, totalBleed = 0,
                 totalHeartDead = 0, totalGastroDead = 0, totalBleedDead = 0;
 
         //total wait time for each patient type (for avgs)
-
+        double totalHeartWait = 0.0, totalGastroWait = 0.0, totalBleedWait = 0.0;
 
         //Makes new patient Patient(number,ailment)
         //adds the new patient to the arraylist of events in order
@@ -52,27 +54,22 @@ public class EventBasedClinicSimulation {
 
             bigTime = current.getTime();
             switch (current.eventType) {
-                case ARRIVAL: // arrival event------------------------------------------------------------------------
+                case ARRIVAL: // arrival event---------------------------------------------------
 
-                    //new patient
+                    //new patient, generates ilness internally
                     Patient p = new Patient(patientID, current.getTime());
 
-                    //add patient to line
-                    patQ.addInOrder(p);
+                    //if line is empty, get in the front of the line and spawn a treatment event
+                    if (patQ.count == 0) {
+                        patQ.addFront(p);
 
-//                    //how long is the current waiting lines total treatment time? (sum of treatment times)
-//                    currentWait = CalcCurrentWait(patQ);
-//
-//                    //how long is p's treatment time?
-//                    double pTreatTime = TimeToTreat(p.getAilmentType(), numDocs);
-//
-//                    //set this patients treatment time to how long it will take to treat them
-//                    p.settTreat(pTreatTime);
-//
-//                    //set this patients wait time to how long the current wait is counting their treatment time
-//                    p.settWait(currentWait);
-
-
+                        eventTime = 1 + bigTime;
+                        Event te = new Event(eventTime, EventType.TREATMENT);
+                        eventQ.addInOrder(te);
+                    } else { //else add patient to line as normal
+                        patQ.addInOrder(p);
+                    }
+                    //**NOTE** Heart patient priority in line is handled in the patient class's compareTo **NOTE**
 
                     //gen new death event
                     eventTime = (bigTime + p.gettDeath());
@@ -93,81 +90,86 @@ public class EventBasedClinicSimulation {
 //                            + "\n\t\t\t\t\t\t\tfrom bigTime " + bigTime);
 
                     break;
-                case DEATH: // death event------------------------------------------------------------------------
-                    //patient died before treatment, remove from Qs
+                case DEATH: // death event----------------------------------------------------
+                    //patient died before treatment, call the morgue, get the corpse outta here
                     //resolve and track the dead patient
                     int died = RemovePatient(current.getPatient(), patQ);
                     switch (died) {
                         case 1:
                             totalHeartDead += 1;
+                            System.out.printf("\n*****HEART PATIENT # %d DIED IN LINE*****\n\n", current.getPatient());
                             break;
                         case 2:
                             totalGastroDead += 1;
+                            System.out.printf("\n*****GASTRO PATIENT # %d DIED IN LINE*****\n\n", current.getPatient());
                             break;
                         case 3:
                             totalBleedDead += 1;
+                            System.out.printf("\n*****BLEEDING PATIENT # %d DIED IN LINE*****\n\n", current.getPatient());
                             break;
                         case -1:
-                            System.err.printf("Tried to kill patient %d, didnt find them.\n", current.getPatient());
+                            System.err.printf("Tried to kill patient %d, didnt find them.\n\n", current.getPatient());
                     }
-//                    //remove treatment event//DEPRECATED
-//                    RemovePatientEvent(current.getPatient(), bigTime, EventType.TREATMENT, eventQ);
 
                     break;
-                case TREATMENT: // treatment event------------------------------------------------------------------------
-                    //treats next patient in line
+                case TREATMENT: // treatment event----------------------------------------
+                    //treats current patient
+                    //this event is essentially the doctor calling "NEXT!"
+                    //if no ones in line, take a "break"
+                    if (patQ.count <= 0) break;
 
-                    //resolve and track the patient
-                    Patient treating = (Patient)patQ.getValue(0);
+                    //resolve and track the next patient in line
+                    Patient treating = (Patient) patQ.getValue(0);
+
                     //increment count of treated patients for type
                     switch (treating.getAilmentType()) {
                         case 1:
                             totalHeart += 1;
+                            totalHeartWait += treating.gettWait(bigTime);
                             break;
                         case 2:
                             totalGastro += 1;
+                            totalGastroWait += treating.gettWait(bigTime);
                             break;
                         case 3:
                             totalBleed += 1;
+                            totalBleedWait += treating.gettWait(bigTime);
                             break;
                         case -1:
                             System.err.printf("Tried to treat patient %d, didnt find them.\n", treating.getID());
                     }
-                    patQ.managedRemove(0);
 
-                    //remove death event
+                    //remove death event, patient cant die in treatment
                     RemovePatientEvent(treating.getID(), bigTime, EventType.DEATH, eventQ);
 
-                    //TODO: Create next treatment event
-                    //gen new treatmentevent
-                    eventTime = (TimeToTreat());
-                    Event te = new Event(eventTime, EventType.TREATMENT, patientID);
+                    patQ.managedRemove(0);//the patient leaves the line and is now being treated
+
+                    //gen new treatmentevent at current time + how long itll take to treat this patient
+
+                    eventTime = (TimeToTreat(treating.getAilmentType(), numDocs)) + bigTime;
+                    Event te = new Event(eventTime, EventType.TREATMENT);
                     eventQ.addInOrder(te);
 
-                    System.out.println("Patient " + patientID + " treatment event created at event time\t" + eventTime
-                            + "\n\t\t\t\t\t\t\t from bigTime " + bigTime);
+                    System.out.println("Patient treatment event created\n at event time" + eventTime
+                            + "\n from bigTime " + bigTime);
 
                     break;
                 case END: // end simulation event-------------------------------------------------------------
-
-                    //todo: Its reportin time
-                    int totalTreated = totalBleed + totalGastro + totalHeart;
-                    int totalDead = totalBleedDead + totalGastroDead + totalHeartDead;
-                    int numpats = ((Patient) patQ.getValue(0)).getID() - 1;
-
-
-                    System.out.printf("Total Patients = %d\n\n", numpats);
-
-                    System.out.printf("Total Treated = %d  Bleed: %d    Gas: %d     Heart: %d   \n",
-                            totalTreated, totalBleed, totalGastro, totalHeart);
-
-                    System.out.printf("Total Dead = %d  Bleed: %d    Gas: %d     Heart: %d   \n",
-                            totalDead, totalBleedDead, totalGastroDead, totalHeartDead);
-
-                    System.out.println("Last Patient ID = " + patientID);
-                    System.out.println("Total Events = " + numEvent);
-
-                    System.exit(0);
+//                    int totalTreated = totalBleed + totalGastro + totalHeart;
+//                    int totalDead = totalBleedDead + totalGastroDead + totalHeartDead;
+//
+//                    System.out.printf("Total Patients = %d\n\n", numpats);
+//
+//                    System.out.printf("Total Treated = %d  Bleed: %d    Gas: %d     Heart: %d   \n",
+//                            totalTreated, totalBleed, totalGastro, totalHeart);
+//
+//                    System.out.printf("Total Dead = %d  Bleed: %d    Gas: %d     Heart: %d   \n",
+//                            totalDead, totalBleedDead, totalGastroDead, totalHeartDead);
+//
+//                    System.out.println("Last Patient ID = " + patientID);
+//                    System.out.println("Total Events = " + numEvent);
+//
+//                    System.exit(0);
             }
 
             //cycle to next event
@@ -176,49 +178,36 @@ public class EventBasedClinicSimulation {
 
         }//end of while(not event 4)
 
-        //todo: Its reportin time
         int totalTreated = totalBleed + totalGastro + totalHeart;
         int totalDead = totalBleedDead + totalGastroDead + totalHeartDead;
-        int numpats = ((Patient) patQ.getValue(0)).getID() - 1;
+        int numpats = patientID - patQ.count;
 
-
-        System.out.printf("Total Patients = %d\n\n", numpats);
+        System.out.println("Total Events = " + numEvent);
+        System.out.printf("Total Patients in line = %d\n\n", patQ.count);
+        System.out.printf("Total Patients treated or dead = %d\n\n", numpats);
 
         System.out.printf("Total Treated = %d  Bleed: %d    Gas: %d     Heart: %d   \n",
                 totalTreated, totalBleed, totalGastro, totalHeart);
 
-        System.out.printf("Total Dead = %d  Bleed: %d    Gas: %d     Heart: %d   \n",
+        System.out.printf("Total Dead = %d  Bleed: %d    Gas: %d     Heart: %d   \n\n",
                 totalDead, totalBleedDead, totalGastroDead, totalHeartDead);
 
-        System.out.println("Last Patient ID = " + patientID);
-        System.out.println("Total Events = " + numEvent);
+        System.out.printf("Avg WaitTimes\n\tHeart: %f\tGas: %f\tBleed: %f\n",
+                totalHeartWait / totalHeart, totalGastroWait / totalGastro, totalBleedWait / totalBleed);
 
         System.exit(0);
 
     }
 
-    private static double CalcCurrentWait(GenericManager pQ) {
-        double currentWait = 0.0;
-        //get the sum of the treatment time for each person in line
-        for (int i = 0; i < pQ.count; i++) {
-            currentWait += ((Patient) (pQ.getValue(i))).gettTreat();
-        }
-        return currentWait;
-    }
-
-
-    private static int RemovePatient(int patient, GenericManager patQ) {
+    private static int RemovePatient(int patient, GenericManager patQ) {//todo verify this works
         Patient patientToRem;
-        Patient tp;
+
         //removes death
         //search the ques for matching items and remove them
         for (int i = 0; i < patQ.getCount(); i++) {
             patientToRem = (Patient) patQ.getValue(i);
             if (patientToRem.getID() == patient) {
-
                 patQ.managedRemove(i);
-                patQ.sort();
-
                 return patientToRem.getAilmentType(); //returns what patient ailment killed the patient
             }
         }
@@ -226,26 +215,12 @@ public class EventBasedClinicSimulation {
     }
 
     private static EventType RemovePatientEvent(int patient, double bigTime, EventType eventType, GenericManager eventQ) {
-
         Event e;
-        Event e2;
         //search the ques for matching items and remove them
         for (int i = 0; i < eventQ.getCount(); i++) {
             e = (Event) eventQ.getValue(i);
 
             if (e.getPatient() == patient && e.getEventType() == eventType) {
-
-//                //decrements the time for all other events for TREATMENTs that are removed infront of them
-//                //since the treatment is removed, move other treatment events up
-//                if (eventType == EventType.TREATMENT) {
-//                    for (int j = 0; j < eventQ.getCount(); j++) {
-//                        e2 = ((Event) eventQ.getValue(j));
-//                        //event e is being removed from the Q, so update the other treatments
-//                        if (e2.eventType == eventType.TREATMENT)
-//                            //TODO: this needs to subtract only the dead patients treatment time, not the events time
-//                        e2.setTime(e2.getTime() + (e.getTime())-bigTime);
-//                    }
-//                }
 
                 eventQ.managedRemove(i);
                 return e.eventType; //returns what event was removed or null in fail case
@@ -262,7 +237,7 @@ public class EventBasedClinicSimulation {
         if (bigX > 0.9) {
             bigX = Math.random();
         }
-        deltaTime = -Math.log(1.0 - bigX) / .05;
+        deltaTime = 60 * Math.log(1.0 - bigX) / -3.0;
         return deltaTime;
 
     }//end timetoarrive
@@ -303,9 +278,8 @@ Has Patient ID, Type of ailment, and arrival, wait, and total time
 class Patient implements Comparable {
     protected int ailmentType;  //1= heart,2=gastro, 3=bleeding
 
-    //arrival time, time waited, time till death, time in system
+    //arrival time, time waited, time of death, time in system
     protected double tArrive;
-    protected double tTreat; //how long ilness will take to treat
     protected double tWait;
     protected double tDeath;
     protected int myDeath;
@@ -314,27 +288,15 @@ class Patient implements Comparable {
     public Patient(int ID, double bigTime) {
         this.ID = ID;
         this.myDeath = ID;
-        tWait = tTreat = 0;//defualt these to zero for safety
+        tWait = 0;//defualt  to zero for safety
         this.ailmentType = setAilmentType();
         tArrive = bigTime;
         settDeath(); //generate patient death time
 
     }
 
-    public double gettTreat() {
-        return tTreat;
-    }
-
-    public void settTreat(double tTreat) {
-        this.tTreat = tTreat;
-    }
-
     public int getID() {
         return ID;
-    }
-
-    public int getMyDeath() {
-        return myDeath;
     }
 
     public int getAilmentType() {
@@ -353,21 +315,12 @@ class Patient implements Comparable {
         return r;
     }
 
-
     public double gettArrive() {
         return tArrive;
     }
 
-    public void settArrive(double tArrive) {
-        this.tArrive = tArrive;
-    }
-
-    public double gettWait() {
-        return tWait;
-    }
-
-    public void settWait(double tWait) {
-        this.tWait = tWait;
+    public double gettWait(double bigTime) {
+        return bigTime - tArrive;
     }
 
     public double gettDeath() {
@@ -376,44 +329,55 @@ class Patient implements Comparable {
 
     private void settDeath() {
         double dTimer;
+        Random r = new Random();
         int t = getAilmentType();
         double mu = 0.0, sigma = 0.0;
         switch (t) {
 
             case 1:
-                mu = 10;
-                sigma = 35;
+                sigma = 10;
+                mu = 35;
                 break;
             case 2:
-                mu = 30;
-                sigma = 80;
+                sigma = 30;
+                mu = 80;
                 break;
             case 3:
-                mu = 20;
-                sigma = 65;
+                sigma = 20;
+                mu = 65;
                 break;
             default:
-                System.err.println("Wtf? This patient doesnt have an illness and expects to die!");
+                System.err.println("This patient doesnt have an illness and expects to die!");
                 System.exit(1);//there is a serious problem, exit
         }
 
-        dTimer = sigma * (Math.random()) + mu;
+        dTimer = sigma * r.nextGaussian() + mu;
         tDeath = tArrive + dTimer;
     }
 
     @Override
-
     public int compareTo(Object o) {
-        if (gettArrive() > ((Patient) o).gettArrive()) {
-            return 1;
-        } else if (gettArrive() < ((Patient) o).gettArrive()) {
-            return -1;
-        } else {
-            return 0;
-        }
+        //it occurs to me that it makes real life logical sense to handle heart patients in the patient comparator
+        int la = getAilmentType();//list patient ailment
+        int ca = ((Patient) o).getAilmentType();//compared ailment
+        boolean bothHeart = (la == 1 && ca == 1);   //both are heart patients
+        boolean neitherHeart = (la != 1 && ca != 1); //neither are heart patients
 
+        if (bothHeart || neitherHeart) { //if theres no heart patients involved or both are compare as normal
+            if (gettArrive() > ((Patient) o).gettArrive()) {
+                return 1;
+            } else if (gettArrive() < ((Patient) o).gettArrive()) {
+                return -1;
+            } else {
+                return 0;
+            }
+        } else if (la == 1) { //the heart patient is the one in line already
+            return -1;
+        } else          //the heart patient is the one joining the line and should be ahead of this non heart patient
+            return 1;
     }
-}
+}//End Patient Class
+
 
 /*=====================================================================================================
 GenericManager class
@@ -533,6 +497,12 @@ class Event implements Comparable {
         this.eventType = eventType;
         this.time = time;
         this.patient = patient;
+    }
+
+    //overloaded constructor for treatment events, theyre not associated with specific patients
+    public Event(double time, EventType eventType) {
+        this.eventType = eventType;
+        this.time = time;
     }
 
     @Override
