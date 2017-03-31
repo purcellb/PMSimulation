@@ -31,7 +31,7 @@ public class EventBasedClinicSimulation {
         GenericManager eventQ = new GenericManager<>(); //order of events
         GenericManager patQ = new GenericManager<>(); //patients in waiting room
         int patientID = 1;  //unique id for patients (and their death event when appropriate)
-        double numDocs = 1.0;    //how many docs are treating patients at the clinic
+        double numDocs = 2.0;    //how many docs are treating patients at the clinic
 
         //
         int numEvent = 0;
@@ -72,7 +72,7 @@ public class EventBasedClinicSimulation {
                     //**NOTE** Heart patient priority in line is handled in the patient class's compareTo **NOTE**
 
                     //gen new death event
-                    eventTime = (bigTime + p.gettDeath());
+                    eventTime = ( p.gettDeath());
                     Event de = new Event(eventTime, EventType.DEATH, patientID);
                     eventQ.addInOrder(de);
 
@@ -155,21 +155,7 @@ public class EventBasedClinicSimulation {
 
                     break;
                 case END: // end simulation event-------------------------------------------------------------
-//                    int totalTreated = totalBleed + totalGastro + totalHeart;
-//                    int totalDead = totalBleedDead + totalGastroDead + totalHeartDead;
-//
-//                    System.out.printf("Total Patients = %d\n\n", numpats);
-//
-//                    System.out.printf("Total Treated = %d  Bleed: %d    Gas: %d     Heart: %d   \n",
-//                            totalTreated, totalBleed, totalGastro, totalHeart);
-//
-//                    System.out.printf("Total Dead = %d  Bleed: %d    Gas: %d     Heart: %d   \n",
-//                            totalDead, totalBleedDead, totalGastroDead, totalHeartDead);
-//
-//                    System.out.println("Last Patient ID = " + patientID);
-//                    System.out.println("Total Events = " + numEvent);
-//
-//                    System.exit(0);
+
             }
 
             //cycle to next event
@@ -183,7 +169,8 @@ public class EventBasedClinicSimulation {
         int numpats = patientID - patQ.count;
 
         System.out.println("Total Events = " + numEvent);
-        System.out.printf("Total Patients in line = %d\n\n", patQ.count);
+        System.out.printf("Total Patients in line = %d", patQ.count);
+        System.out.println("\n\nNumber of Doctorss = " + numDocs);
         System.out.printf("Total Patients treated or dead = %d\n\n", numpats);
 
         System.out.printf("Total Treated = %d  Bleed: %d    Gas: %d     Heart: %d   \n",
@@ -234,9 +221,7 @@ public class EventBasedClinicSimulation {
         double deltaTime;
         double bigX;
         bigX = Math.random();
-        if (bigX > 0.9) {
-            bigX = Math.random();
-        }
+
         deltaTime = 60 * Math.log(1.0 - bigX) / -3.0;
         return deltaTime;
 
@@ -246,6 +231,9 @@ public class EventBasedClinicSimulation {
     public static double TimeToTreat(int a, double numDocs) {
         double timeTreat;
         double bigx = Math.random();
+//        while (bigx > 0.9 || bigx < 0.1) { //throw out extreme nums on the distro
+//            bigx = Math.random();
+//        }
         double rate = 0.0; //number of patients/hr
         switch (a) {
 
